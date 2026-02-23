@@ -49,9 +49,10 @@ export async function findCarByRego(
 ): Promise<string> {
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      await page.goto(RACV_URL, { waitUntil: "networkidle", timeout: 90000 });
+      await page.goto(RACV_URL, { waitUntil: "domcontentloaded", timeout: 120000 });
 
-      await page.locator('input[name="rego"]').waitFor({ timeout: 60000 });
+      // Wait for the LWC form to render (may take a while on slow servers)
+      await page.locator('input[name="rego"]').waitFor({ timeout: 90000 });
       await humanDelay(2000, 3000);
 
       await page.locator('input[name="rego"]').fill(rego);
@@ -61,10 +62,10 @@ export async function findCarByRego(
 
       // Wait for either the address field (success) or an error message
       const result = await Promise.race([
-        page.locator('input[name="addressSearch"]').waitFor({ timeout: 60000 }).then(() => "found" as const),
-        waitForText(page, "couldn't find", 60000).then((found) => found ? "not_found" as const : "timeout" as const),
-        waitForText(page, "not found", 60000).then((found) => found ? "not_found" as const : "timeout" as const),
-        waitForText(page, "try again", 60000).then((found) => found ? "not_found" as const : "timeout" as const),
+        page.locator('input[name="addressSearch"]').waitFor({ timeout: 90000 }).then(() => "found" as const),
+        waitForText(page, "couldn't find", 90000).then((found) => found ? "not_found" as const : "timeout" as const),
+        waitForText(page, "not found", 90000).then((found) => found ? "not_found" as const : "timeout" as const),
+        waitForText(page, "try again", 90000).then((found) => found ? "not_found" as const : "timeout" as const),
       ]);
 
       if (result === "not_found") {
@@ -106,8 +107,8 @@ export async function findCarManually(
 ): Promise<string> {
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      await page.goto(RACV_URL, { waitUntil: "networkidle", timeout: 90000 });
-      await page.locator('input[name="rego"]').waitFor({ timeout: 60000 });
+      await page.goto(RACV_URL, { waitUntil: "domcontentloaded", timeout: 120000 });
+      await page.locator('input[name="rego"]').waitFor({ timeout: 90000 });
       await humanDelay(2000, 3000);
 
       // Click manual lookup link
@@ -153,29 +154,41 @@ export async function fillCarDetails(
   page: Page,
   input: CarDetailsInput
 ): Promise<void> {
+  // Normalize address: strip postcodes, extra commas, state abbreviations
+  // RACV autocomplete works best with short queries like "500 Bourke St Melbourne"
+  const cleanAddress = input.address
+    .replace(/,?\s*\d{4}\s*$/, "")       // strip trailing postcode
+    .replace(/,?\s*(VIC|NSW|QLD|SA|WA|TAS|NT|ACT)\s*/gi, " ") // strip state
+    .replace(/\s+/g, " ")                // collapse whitespace
+    .trim();
+
   // Address autocomplete (with retry)
   let addressFilled = false;
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const searchTerm = attempt <= 2 ? cleanAddress : input.address;
+    console.log(`  Address attempt ${attempt}: searching "${searchTerm}"`);
+
     await page.locator('input[name="addressSearch"]').click();
     await humanDelay(300, 500);
     await page.locator('input[name="addressSearch"]').fill("");
-    await page.locator('input[name="addressSearch"]').pressSequentially(input.address, { delay: 100 });
+    await page.locator('input[name="addressSearch"]').pressSequentially(searchTerm, { delay: 100 });
     await humanDelay(4000, 6000);
 
-    // Click first suggestion
-    const sugg = page.locator("li").filter({ hasText: /\d+.*\w+.*\d{4}/ }).first();
+    // Click first suggestion that looks like a real address (has a postcode)
+    const sugg = page.locator("li").filter({ hasText: /\d{4}/ }).first();
     if ((await sugg.count()) > 0) {
       await sugg.click();
       await humanDelay(1500, 2000);
       const addrVal = await page.locator('input[name="addressSearch"]').inputValue();
       if (addrVal && addrVal.length > 10) {
+        console.log(`  Address filled: ${addrVal}`);
         addressFilled = true;
         break;
       }
     }
 
     // Fallback: click any li with street text
-    const fallback = page.locator('li:has-text("St"), li:has-text("Rd"), li:has-text("Ave")').first();
+    const fallback = page.locator('li:has-text("St"), li:has-text("Rd"), li:has-text("Ave"), li:has-text("Street"), li:has-text("Road")').first();
     if ((await fallback.count()) > 0) {
       await fallback.click();
       await humanDelay(1500, 2000);

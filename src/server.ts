@@ -142,7 +142,7 @@ IMPORTANT:
         "Step 2 of 4: Fill car details (address, finance, purpose). Call immediately after start_quote. Takes 60-90 seconds.",
       inputSchema: {
         sessionId: z.string().describe("Session ID from start_quote"),
-        address: z.string().describe("Overnight parking address (e.g. '1 Collins St Melbourne')"),
+        address: z.string().describe("Overnight parking address — use a simple format like '500 Bourke St Melbourne'. Do NOT include postcode or state."),
         underFinance: z.boolean().describe("Is the car currently under finance?"),
         purpose: z.string().describe("Main purpose of the car: 'Private', 'Business', or 'Private and Business'"),
         businessRegistered: z.boolean().describe("Is the car registered under a business name?"),
