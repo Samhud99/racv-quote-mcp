@@ -29,29 +29,26 @@ function createMcpServer(): McpServer {
       version: "1.0.0",
     },
     {
-      instructions: `You are connected to an RACV car insurance quote server. This server automates a real browser to get quotes from the RACV website.
+      instructions: `You are connected to an RACV car insurance quote server. This server automates a real browser to get live quotes from the RACV website. Each tool call takes 60-90 seconds.
 
-CRITICAL WORKFLOW — follow this exactly:
+HOW TO USE — have a natural conversation to collect details, then run the tools:
 
-1. BEFORE calling any tools, ask the user for ALL of these details in a single message:
-   - Vehicle: registration number (rego) + state, OR year + make + model + body type
-   - Overnight parking address (e.g. "10 Smith St Richmond")
-   - Is the car under finance? (yes/no)
-   - Main purpose: Private, Business, or Private and Business
-   - Is the car registered under a business name? (yes/no)
-   - Is the driver an RACV member? (yes/no)
-   - Driver's gender
-   - Driver's age
-   - Age when they got their licence
-   - Any accidents or claims in the last 5 years? (yes/no)
+Step 1: Ask about the car.
+  "What's your rego and state? (e.g. ABC123, VIC)" — or if they don't have it, ask for year, make, model, and body type.
 
-2. Once you have ALL details, call the 4 tools in sequence:
-   start_quote → fill_car_details → fill_driver_details → get_quotes
+Step 2: Ask about the car details.
+  "Where does the car park overnight? Is it under finance? Is it used for Private, Business, or both? Is it registered under a business name?"
 
-3. Each tool takes 60-90 seconds. Tell the user it will take a few minutes total.
+Step 3: Ask about the driver.
+  "Are you an RACV member? What's your gender and age? What age did you get your licence? Any accidents or claims in the last 5 years?"
 
-4. Do NOT call start_quote until you have every detail listed above.
-5. Do NOT build an app or UI — call the tools directly.`,
+Once you have everything, tell the user "This will take a few minutes — I'm running through the RACV quote form now" and call all 4 tools in sequence:
+  start_quote → fill_car_details → fill_driver_details → get_quotes
+
+IMPORTANT:
+- Collect ALL info before calling start_quote. Do NOT call tools mid-conversation.
+- Do NOT build an application or UI. Call the tools directly.
+- If start_quote fails, tell the user and offer to retry or try manual car entry.`,
     }
   );
 
@@ -62,7 +59,7 @@ CRITICAL WORKFLOW — follow this exactly:
     {
       title: "Start Quote",
       description:
-        "Step 1 of 4: Start a new RACV car insurance quote. IMPORTANT: Before calling this tool, ask the user for ALL details needed for the entire quote in one go: (1) rego + state OR year/make/model/bodyType, (2) overnight parking address, (3) under finance? (4) purpose: Private/Business/Private and Business, (5) business registered? (6) RACV member? (7) gender, (8) age, (9) age when they got their licence, (10) any accidents in last 5 years? Gather everything first, then call all 4 tools in sequence. Each tool takes 60-90 seconds (real browser automation). Do NOT build a UI — call these tools directly.",
+        "Step 1 of 4: Start a new RACV car insurance quote by finding the car. Takes 60-90 seconds. Provide rego+state or year+make+model+bodyType. Only call after you have collected ALL user details for the entire flow.",
       inputSchema: {
         rego: z
           .string()
@@ -142,7 +139,7 @@ CRITICAL WORKFLOW — follow this exactly:
     {
       title: "Fill Car Details",
       description:
-        "Step 2 of 4: Fill car details for an active quote session. Call immediately after start_quote succeeds — you should already have all the details from asking the user upfront. Takes 60-90 seconds.",
+        "Step 2 of 4: Fill car details (address, finance, purpose). Call immediately after start_quote. Takes 60-90 seconds.",
       inputSchema: {
         sessionId: z.string().describe("Session ID from start_quote"),
         address: z.string().describe("Overnight parking address (e.g. '1 Collins St Melbourne')"),
@@ -203,7 +200,7 @@ CRITICAL WORKFLOW — follow this exactly:
     {
       title: "Fill Driver Details",
       description:
-        "Step 3 of 4: Fill driver details for an active quote session. Call immediately after fill_car_details succeeds — you should already have all the details from asking the user upfront. Takes 60-90 seconds.",
+        "Step 3 of 4: Fill driver details (membership, gender, age, licence, accidents). Call immediately after fill_car_details. Takes 60-90 seconds.",
       inputSchema: {
         sessionId: z.string().describe("Session ID from start_quote"),
         racvMember: z.boolean().describe("Is the driver an existing RACV member?"),
