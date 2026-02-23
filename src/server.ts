@@ -35,7 +35,7 @@ function createMcpServer(): McpServer {
     {
       title: "Start Quote",
       description:
-        "Start a new RACV car insurance quote session. Returns a session ID to use in subsequent calls. Call this first before any other tools.",
+        "Step 1 of 4: Start a new RACV car insurance quote. This tool launches a real browser and navigates the RACV website — it takes 60-90 seconds. Do NOT try to build an application or UI to call these tools — call them directly. The full flow is: start_quote → fill_car_details → fill_driver_details → get_quotes.",
       inputSchema: {
         rego: z
           .string()
@@ -52,8 +52,10 @@ function createMcpServer(): McpServer {
       },
     },
     async ({ rego, state, make, model, year, bodyType }) => {
+      let sessionId: string | undefined;
       try {
         const session = await createSession();
+        sessionId = session.id;
         let carDescription: string;
 
         if (rego && state) {
@@ -87,11 +89,12 @@ function createMcpServer(): McpServer {
           ],
         };
       } catch (err: any) {
+        if (sessionId) await destroySession(sessionId).catch(() => {});
         return {
           content: [
             {
               type: "text" as const,
-              text: `Failed to start quote: ${err.message}`,
+              text: `Failed to start quote: ${err.message}. Call start_quote again to retry.`,
             },
           ],
           isError: true,
@@ -107,7 +110,7 @@ function createMcpServer(): McpServer {
     {
       title: "Fill Car Details",
       description:
-        "Fill in car details (address, finance status, purpose, etc.) for an active quote session. Call after start_quote.",
+        "Step 2 of 4: Fill car details for an active quote session. Call after start_quote. Takes 60-90 seconds. Do NOT build a UI — call this tool directly with the sessionId from start_quote.",
       inputSchema: {
         sessionId: z.string().describe("Session ID from start_quote"),
         address: z.string().describe("Overnight parking address (e.g. '1 Collins St Melbourne')"),
@@ -152,8 +155,9 @@ function createMcpServer(): McpServer {
           ],
         };
       } catch (err: any) {
+        await destroySession(sessionId).catch(() => {});
         return {
-          content: [{ type: "text" as const, text: `Failed to fill car details: ${err.message}` }],
+          content: [{ type: "text" as const, text: `Failed to fill car details: ${err.message}. Session destroyed — call start_quote to begin a new quote.` }],
           isError: true,
         };
       }
@@ -167,7 +171,7 @@ function createMcpServer(): McpServer {
     {
       title: "Fill Driver Details",
       description:
-        "Fill in driver details (membership, gender, age, licence age, accidents) for an active quote session. Call after fill_car_details.",
+        "Step 3 of 4: Fill driver details for an active quote session. Call after fill_car_details. Takes 60-90 seconds. Do NOT build a UI — call this tool directly with the sessionId.",
       inputSchema: {
         sessionId: z.string().describe("Session ID from start_quote"),
         racvMember: z.boolean().describe("Is the driver an existing RACV member?"),
@@ -210,8 +214,9 @@ function createMcpServer(): McpServer {
           ],
         };
       } catch (err: any) {
+        await destroySession(sessionId).catch(() => {});
         return {
-          content: [{ type: "text" as const, text: `Failed to fill driver details: ${err.message}` }],
+          content: [{ type: "text" as const, text: `Failed to fill driver details: ${err.message}. Session destroyed — call start_quote to begin a new quote.` }],
           isError: true,
         };
       }
@@ -225,7 +230,7 @@ function createMcpServer(): McpServer {
     {
       title: "Get Quotes",
       description:
-        "Extract the insurance quote results from an active session. Call after fill_driver_details. Returns comprehensive and third party quotes with yearly/monthly prices.",
+        "Step 4 of 4: Extract insurance quote results. Call after fill_driver_details. Returns comprehensive and third party quotes with yearly/monthly pricing. This is the final step — the session is cleaned up automatically after quotes are retrieved.",
       inputSchema: {
         sessionId: z.string().describe("Session ID from start_quote"),
       },
@@ -254,8 +259,9 @@ function createMcpServer(): McpServer {
           ],
         };
       } catch (err: any) {
+        await destroySession(sessionId).catch(() => {});
         return {
-          content: [{ type: "text" as const, text: `Failed to extract quotes: ${err.message}` }],
+          content: [{ type: "text" as const, text: `Failed to extract quotes: ${err.message}. Session destroyed — call start_quote to begin a new quote.` }],
           isError: true,
         };
       }

@@ -47,27 +47,36 @@ export async function findCarByRego(
   rego: string,
   state: string
 ): Promise<string> {
-  await page.goto(RACV_URL, { waitUntil: "networkidle", timeout: 90000 });
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      await page.goto(RACV_URL, { waitUntil: "networkidle", timeout: 90000 });
 
-  await page.locator('input[name="rego"]').waitFor({ timeout: 60000 });
-  await humanDelay(2000, 3000);
+      await page.locator('input[name="rego"]').waitFor({ timeout: 60000 });
+      await humanDelay(2000, 3000);
 
-  await page.locator('input[name="rego"]').fill(rego);
-  await page.locator('select[name="jurisdictionFieldValue"]').selectOption({ label: state });
-  await humanDelay(800, 1200);
-  await page.locator('button:has-text("Find Your car")').click({ force: true });
+      await page.locator('input[name="rego"]').fill(rego);
+      await page.locator('select[name="jurisdictionFieldValue"]').selectOption({ label: state });
+      await humanDelay(800, 1200);
+      await page.locator('button:has-text("Find Your car")').click({ force: true });
 
-  // Wait for car details form
-  await page.locator('input[name="addressSearch"]').waitFor({ timeout: 45000 });
+      // Wait for car details form
+      await page.locator('input[name="addressSearch"]').waitFor({ timeout: 45000 });
 
-  // Extract car description from page
-  const carDesc = await page.evaluate(() => {
-    const text = document.body.innerText;
-    const match = text.match(/(\d{4}\s+[A-Z][A-Za-z]+\s+[A-Z][A-Za-z]+[\s\S]*?)(?:EDIT|Not your car)/);
-    return match?.[1]?.trim() || "Car found";
-  });
+      // Extract car description from page
+      const carDesc = await page.evaluate(() => {
+        const text = document.body.innerText;
+        const match = text.match(/(\d{4}\s+[A-Z][A-Za-z]+\s+[A-Z][A-Za-z]+[\s\S]*?)(?:EDIT|Not your car)/);
+        return match?.[1]?.trim() || "Car found";
+      });
 
-  return carDesc;
+      return carDesc;
+    } catch (err) {
+      if (attempt === 2) throw err;
+      console.log(`  findCarByRego attempt ${attempt} failed, retrying...`);
+      await humanDelay(2000, 3000);
+    }
+  }
+  throw new Error("findCarByRego: unreachable");
 }
 
 // ─── Step 1b: Find car manually ─────────────────────────────────────────────
@@ -79,38 +88,47 @@ export async function findCarManually(
   model: string,
   bodyType: string
 ): Promise<string> {
-  await page.goto(RACV_URL, { waitUntil: "networkidle", timeout: 90000 });
-  await page.locator('input[name="rego"]').waitFor({ timeout: 60000 });
-  await humanDelay(2000, 3000);
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      await page.goto(RACV_URL, { waitUntil: "networkidle", timeout: 90000 });
+      await page.locator('input[name="rego"]').waitFor({ timeout: 60000 });
+      await humanDelay(2000, 3000);
 
-  // Click manual lookup link
-  await page.locator('a:has-text("Find your car manually")').click();
-  await humanDelay(1500, 2000);
+      // Click manual lookup link
+      await page.locator('a:has-text("Find your car manually")').click();
+      await humanDelay(1500, 2000);
 
-  // Select Year
-  const yearSelect = page.locator('select').filter({ hasText: "Year" }).first();
-  await yearSelect.selectOption(year);
-  await humanDelay(1000, 1500);
+      // Select Year
+      const yearSelect = page.locator('select').filter({ hasText: "Year" }).first();
+      await yearSelect.selectOption(year);
+      await humanDelay(1000, 1500);
 
-  // Select Make
-  const makeSelect = page.locator('select').filter({ hasText: "Make" }).first();
-  await makeSelect.selectOption(make);
-  await humanDelay(1000, 1500);
+      // Select Make
+      const makeSelect = page.locator('select').filter({ hasText: "Make" }).first();
+      await makeSelect.selectOption(make);
+      await humanDelay(1000, 1500);
 
-  // Select Model
-  const modelSelect = page.locator('select').filter({ hasText: "Model" }).first();
-  await modelSelect.selectOption(model);
-  await humanDelay(1000, 1500);
+      // Select Model
+      const modelSelect = page.locator('select').filter({ hasText: "Model" }).first();
+      await modelSelect.selectOption(model);
+      await humanDelay(1000, 1500);
 
-  // Select Body Type
-  const bodySelect = page.locator('select').filter({ hasText: "Body" }).first();
-  await bodySelect.selectOption(bodyType);
-  await humanDelay(1000, 1500);
+      // Select Body Type
+      const bodySelect = page.locator('select').filter({ hasText: "Body" }).first();
+      await bodySelect.selectOption(bodyType);
+      await humanDelay(1000, 1500);
 
-  // Wait for address field to confirm car selection
-  await page.locator('input[name="addressSearch"]').waitFor({ timeout: 15000 });
+      // Wait for address field to confirm car selection
+      await page.locator('input[name="addressSearch"]').waitFor({ timeout: 15000 });
 
-  return `${year} ${make} ${model} ${bodyType}`;
+      return `${year} ${make} ${model} ${bodyType}`;
+    } catch (err) {
+      if (attempt === 2) throw err;
+      console.log(`  findCarManually attempt ${attempt} failed, retrying...`);
+      await humanDelay(2000, 3000);
+    }
+  }
+  throw new Error("findCarManually: unreachable");
 }
 
 // ─── Step 2: Fill car details ───────────────────────────────────────────────
@@ -236,14 +254,7 @@ export async function fillDriverDetails(
   await humanDelay(800, 1200);
 
   // Continue to Quote Results (Aura API takes 15-20s)
-  await page.locator('button:has-text("Continue")').click({ force: true });
-  const quoteReached = await waitForText(page, "/Yearly", 60000);
-  if (!quoteReached) {
-    const body = await page.evaluate(() => document.body.innerText);
-    if (!body.includes("Comprehensive") && !body.includes("Your quote summary")) {
-      throw new Error("Failed to reach quote results page");
-    }
-  }
+  await clickContinueAndWait(page, "/Yearly");
 }
 
 // ─── Step 4: Extract quote results ──────────────────────────────────────────
