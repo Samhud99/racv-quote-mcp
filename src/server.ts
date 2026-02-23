@@ -23,10 +23,37 @@ const PORT = parseInt(process.env.PORT || "3000", 10);
 // ─── MCP Server ──────────────────────────────────────────────────────────────
 
 function createMcpServer(): McpServer {
-  const server = new McpServer({
-    name: "racv-quote",
-    version: "1.0.0",
-  });
+  const server = new McpServer(
+    {
+      name: "racv-quote",
+      version: "1.0.0",
+    },
+    {
+      instructions: `You are connected to an RACV car insurance quote server. This server automates a real browser to get quotes from the RACV website.
+
+CRITICAL WORKFLOW — follow this exactly:
+
+1. BEFORE calling any tools, ask the user for ALL of these details in a single message:
+   - Vehicle: registration number (rego) + state, OR year + make + model + body type
+   - Overnight parking address (e.g. "10 Smith St Richmond")
+   - Is the car under finance? (yes/no)
+   - Main purpose: Private, Business, or Private and Business
+   - Is the car registered under a business name? (yes/no)
+   - Is the driver an RACV member? (yes/no)
+   - Driver's gender
+   - Driver's age
+   - Age when they got their licence
+   - Any accidents or claims in the last 5 years? (yes/no)
+
+2. Once you have ALL details, call the 4 tools in sequence:
+   start_quote → fill_car_details → fill_driver_details → get_quotes
+
+3. Each tool takes 60-90 seconds. Tell the user it will take a few minutes total.
+
+4. Do NOT call start_quote until you have every detail listed above.
+5. Do NOT build an app or UI — call the tools directly.`,
+    }
+  );
 
   // ── Tool: start_quote ────────────────────────────────────────────────────
 
