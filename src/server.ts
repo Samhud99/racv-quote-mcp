@@ -35,7 +35,7 @@ function createMcpServer(): McpServer {
     {
       title: "Start Quote",
       description:
-        "Step 1 of 4: Start a new RACV car insurance quote. This tool launches a real browser and navigates the RACV website — it takes 60-90 seconds. Do NOT try to build an application or UI to call these tools — call them directly. The full flow is: start_quote → fill_car_details → fill_driver_details → get_quotes.",
+        "Step 1 of 4: Start a new RACV car insurance quote. IMPORTANT: Before calling this tool, ask the user for ALL details needed for the entire quote in one go: (1) rego + state OR year/make/model/bodyType, (2) overnight parking address, (3) under finance? (4) purpose: Private/Business/Private and Business, (5) business registered? (6) RACV member? (7) gender, (8) age, (9) age when they got their licence, (10) any accidents in last 5 years? Gather everything first, then call all 4 tools in sequence. Each tool takes 60-90 seconds (real browser automation). Do NOT build a UI — call these tools directly.",
       inputSchema: {
         rego: z
           .string()
@@ -90,11 +90,16 @@ function createMcpServer(): McpServer {
         };
       } catch (err: any) {
         if (sessionId) await destroySession(sessionId).catch(() => {});
+        const msg = err.message || "Unknown error";
+        const isRegoNotFound = msg.includes("not found") || msg.includes("couldn't find");
+        const guidance = isRegoNotFound
+          ? "Ask the user to verify their rego and state, or try start_quote with year/make/model/bodyType instead."
+          : "Call start_quote again to retry — the RACV website may have been slow to respond.";
         return {
           content: [
             {
               type: "text" as const,
-              text: `Failed to start quote: ${err.message}. Call start_quote again to retry.`,
+              text: `Failed to start quote: ${msg}. ${guidance}`,
             },
           ],
           isError: true,
@@ -110,7 +115,7 @@ function createMcpServer(): McpServer {
     {
       title: "Fill Car Details",
       description:
-        "Step 2 of 4: Fill car details for an active quote session. Call after start_quote. Takes 60-90 seconds. Do NOT build a UI — call this tool directly with the sessionId from start_quote.",
+        "Step 2 of 4: Fill car details for an active quote session. Call immediately after start_quote succeeds — you should already have all the details from asking the user upfront. Takes 60-90 seconds.",
       inputSchema: {
         sessionId: z.string().describe("Session ID from start_quote"),
         address: z.string().describe("Overnight parking address (e.g. '1 Collins St Melbourne')"),
@@ -171,7 +176,7 @@ function createMcpServer(): McpServer {
     {
       title: "Fill Driver Details",
       description:
-        "Step 3 of 4: Fill driver details for an active quote session. Call after fill_car_details. Takes 60-90 seconds. Do NOT build a UI — call this tool directly with the sessionId.",
+        "Step 3 of 4: Fill driver details for an active quote session. Call immediately after fill_car_details succeeds — you should already have all the details from asking the user upfront. Takes 60-90 seconds.",
       inputSchema: {
         sessionId: z.string().describe("Session ID from start_quote"),
         racvMember: z.boolean().describe("Is the driver an existing RACV member?"),

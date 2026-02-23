@@ -59,8 +59,17 @@ export async function findCarByRego(
       await humanDelay(800, 1200);
       await page.locator('button:has-text("Find Your car")').click({ force: true });
 
-      // Wait for car details form
-      await page.locator('input[name="addressSearch"]').waitFor({ timeout: 45000 });
+      // Wait for either the address field (success) or an error message
+      const result = await Promise.race([
+        page.locator('input[name="addressSearch"]').waitFor({ timeout: 60000 }).then(() => "found" as const),
+        waitForText(page, "couldn't find", 60000).then((found) => found ? "not_found" as const : "timeout" as const),
+        waitForText(page, "not found", 60000).then((found) => found ? "not_found" as const : "timeout" as const),
+        waitForText(page, "try again", 60000).then((found) => found ? "not_found" as const : "timeout" as const),
+      ]);
+
+      if (result === "not_found") {
+        throw new Error(`Registration ${rego} (${state}) was not found on the RACV website. Ask the user to double-check the rego and state, or try manual entry with year/make/model/bodyType instead.`);
+      }
 
       // Extract car description from page
       const carDesc = await page.evaluate(() => {
@@ -70,9 +79,16 @@ export async function findCarByRego(
       });
 
       return carDesc;
-    } catch (err) {
-      if (attempt === 2) throw err;
-      console.log(`  findCarByRego attempt ${attempt} failed, retrying...`);
+    } catch (err: any) {
+      // On final attempt, capture page state for diagnostics
+      if (attempt === 2) {
+        try {
+          const pageText = await page.evaluate(() => document.body.innerText.substring(0, 500));
+          console.error(`  findCarByRego failed. Page text: ${pageText}`);
+        } catch {}
+        throw err;
+      }
+      console.log(`  findCarByRego attempt ${attempt} failed: ${err.message}, retrying...`);
       await humanDelay(2000, 3000);
     }
   }
