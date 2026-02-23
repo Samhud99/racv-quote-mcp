@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: racv-quote-mcp
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: NODE_ENV
+        value: production
