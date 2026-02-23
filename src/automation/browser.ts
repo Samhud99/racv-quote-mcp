@@ -11,6 +11,13 @@ export async function launchBrowser(headless = true): Promise<{
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-blink-features=AutomationControlled",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--disable-extensions",
+      "--disable-background-networking",
+      "--disable-default-apps",
+      "--disable-sync",
+      "--no-first-run",
       "--window-size=1920,1080",
     ],
   });

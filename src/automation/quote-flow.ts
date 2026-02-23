@@ -20,7 +20,7 @@ const RACV_URL = "https://my.racv.com.au/s/motor-insurance?p=CAR";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-async function waitForText(page: Page, text: string, timeoutMs = 30000): Promise<boolean> {
+async function waitForText(page: Page, text: string, timeoutMs = 60000): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const body = await page.evaluate(() => document.body.innerText);
@@ -33,7 +33,7 @@ async function waitForText(page: Page, text: string, timeoutMs = 30000): Promise
 async function clickContinueAndWait(page: Page, targetText: string, maxRetries = 3): Promise<void> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     await page.locator('button:has-text("Continue")').click({ force: true });
-    const found = await waitForText(page, targetText, 25000);
+    const found = await waitForText(page, targetText, 45000);
     if (found) return;
     console.log(`  Continue attempt ${attempt}/${maxRetries} — page didn't advance`);
   }
@@ -47,7 +47,10 @@ export async function findCarByRego(
   rego: string,
   state: string
 ): Promise<string> {
-  await page.goto(RACV_URL, { waitUntil: "networkidle", timeout: 60000 });
+  await page.goto(RACV_URL, { waitUntil: "networkidle", timeout: 90000 });
+
+  await page.locator('input[name="rego"]').waitFor({ timeout: 60000 });
+  await humanDelay(2000, 3000);
 
   await page.locator('input[name="rego"]').fill(rego);
   await page.locator('select[name="jurisdictionFieldValue"]').selectOption({ label: state });
@@ -55,7 +58,7 @@ export async function findCarByRego(
   await page.locator('button:has-text("Find Your car")').click({ force: true });
 
   // Wait for car details form
-  await page.locator('input[name="addressSearch"]').waitFor({ timeout: 20000 });
+  await page.locator('input[name="addressSearch"]').waitFor({ timeout: 45000 });
 
   // Extract car description from page
   const carDesc = await page.evaluate(() => {
@@ -76,7 +79,9 @@ export async function findCarManually(
   model: string,
   bodyType: string
 ): Promise<string> {
-  await page.goto(RACV_URL, { waitUntil: "networkidle", timeout: 60000 });
+  await page.goto(RACV_URL, { waitUntil: "networkidle", timeout: 90000 });
+  await page.locator('input[name="rego"]').waitFor({ timeout: 60000 });
+  await humanDelay(2000, 3000);
 
   // Click manual lookup link
   await page.locator('a:has-text("Find your car manually")').click();
@@ -232,7 +237,7 @@ export async function fillDriverDetails(
 
   // Continue to Quote Results (Aura API takes 15-20s)
   await page.locator('button:has-text("Continue")').click({ force: true });
-  const quoteReached = await waitForText(page, "/Yearly", 35000);
+  const quoteReached = await waitForText(page, "/Yearly", 60000);
   if (!quoteReached) {
     const body = await page.evaluate(() => document.body.innerText);
     if (!body.includes("Comprehensive") && !body.includes("Your quote summary")) {
